@@ -1,0 +1,6 @@
+{
+  "name": "AttendIQ",
+  "description": "Track Smart. Stay Ahead. Luxury minimalist academic attendance intelligence and semester planner.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,345 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isDocOwner() {
+      return isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    function isValidUserProfile(data, uid) {
+      return data.keys().hasAll(['userId', 'name', 'email', 'targetAttendance', 'semesterStart', 'semesterEnd']) &&
+        data.keys().hasOnly([
+          'userId', 'name', 'email', 'studentId', 'college', 'branch', 'program', 'semester',
+          'semesterNumber', 'currentWeek', 'totalWeeks', 'targetAttendance', 'semesterStart', 'semesterEnd',
+          'dailyStudyGoalHours', 'alertLowAttendance', 'alertExamReminders', 'alertWeeklyDigest',
+          'onboardingCompleted'
+        ]) &&
+        data.userId is string && data.userId == uid &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 160 &&
+        data.targetAttendance is number && data.targetAttendance >= 50 && data.targetAttendance <= 95 &&
+        data.semesterStart is string && data.semesterStart.size() >= 4 && data.semesterStart.size() <= 20 &&
+        data.semesterEnd is string && data.semesterEnd.size() >= 4 && data.semesterEnd.size() <= 20 &&
+        (!('studentId' in data) || (data.studentId is string && data.studentId.size() <= 40)) &&
+        (!('college' in data) || (data.college is string && data.college.size() <= 120)) &&
+        (!('branch' in data) || (data.branch is string && data.branch.size() <= 120)) &&
+        (!('program' in data) || (data.program is string && data.program.size() <= 120)) &&
+        (!('semester' in data) || (data.semester is string && data.semester.size() <= 80)) &&
+        (!('semesterNumber' in data) || (data.semesterNumber is number && data.semesterNumber >= 1 && data.semesterNumber <= 12)) &&
+        (!('currentWeek' in data) || (data.currentWeek is number && data.currentWeek >= 1 && data.currentWeek <= 30)) &&
+        (!('totalWeeks' in data) || (data.totalWeeks is number && data.totalWeeks >= 1 && data.totalWeeks <= 30)) &&
+        (!('dailyStudyGoalHours' in data) || (data.dailyStudyGoalHours is number && data.dailyStudyGoalHours >= 0.5 && data.dailyStudyGoalHours <= 16)) &&
+        (!('alertLowAttendance' in data) || data.alertLowAttendance is bool) &&
+        (!('alertExamReminders' in data) || data.alertExamReminders is bool) &&
+        (!('alertWeeklyDigest' in data) || data.alertWeeklyDigest is bool) &&
+        (!('onboardingCompleted' in data) || data.onboardingCompleted is bool);
+    }
+
+    function isValidSubject(data) {
+      return data.keys().hasAll(['userId', 'code', 'name', 'attendedClasses', 'totalClasses', 'weeklyHours']) &&
+        data.keys().hasOnly([
+          'userId', 'code', 'name', 'instructor', 'credits',
+          'attendedClasses', 'totalClasses', 'weeklyHours', 'gradePoint', 'currentGrade',
+          'targetAttendance'
+        ]) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.code is string && data.code.size() >= 1 && data.code.size() <= 20 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.attendedClasses is number && data.attendedClasses >= 0 &&
+        data.totalClasses is number && data.totalClasses >= 0 &&
+        data.attendedClasses <= data.totalClasses &&
+        data.weeklyHours is number && data.weeklyHours >= 1 && data.weeklyHours <= 20 &&
+        (!('instructor' in data) || (data.instructor is string && data.instructor.size() <= 100)) &&
+        (!('credits' in data) || (data.credits is number && data.credits >= 1 && data.credits <= 10)) &&
+        (!('gradePoint' in data) || (data.gradePoint is number && data.gradePoint >= 0 && data.gradePoint <= 10)) &&
+        (!('currentGrade' in data) || (data.currentGrade is string && data.currentGrade.size() <= 8)) &&
+        (!('targetAttendance' in data) || (data.targetAttendance is number && data.targetAttendance >= 50 && data.targetAttendance <= 95));
+    }
+
+    function isValidAttendanceLog(data) {
+      return data.keys().hasAll(['userId', 'subjectId', 'courseCode', 'subjectName', 'status', 'dateISO', 'topic']) &&
+        data.keys().hasOnly(['userId', 'subjectId', 'courseCode', 'subjectName', 'status', 'dateISO', 'topic', 'timetableSlotId']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.subjectId is string && data.subjectId.size() >= 1 && data.subjectId.size() <= 128 &&
+        data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 20 &&
+        data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120 &&
+        data.status in ['present', 'absent', 'cancelled'] &&
+        data.dateISO is string && data.dateISO.size() >= 4 && data.dateISO.size() <= 20 &&
+        data.topic is string && data.topic.size() <= 200 &&
+        (!('timetableSlotId' in data) || (data.timetableSlotId is string && data.timetableSlotId.size() <= 128));
+    }
+
+    function isValidTimetableSlot(data) {
+      return data.keys().hasAll(['userId', 'day', 'timeRange', 'courseCode', 'subjectName', 'room', 'sessionType']) &&
+        data.keys().hasOnly([
+          'userId', 'day', 'timeRange', 'courseCode', 'subjectName', 'room', 'sessionType', 'professor'
+        ]) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] &&
+        data.timeRange is string && data.timeRange.size() >= 3 && data.timeRange.size() <= 40 &&
+        data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 20 &&
+        data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120 &&
+        data.room is string && data.room.size() >= 1 && data.room.size() <= 40 &&
+        data.sessionType in ['Lecture', 'Laboratory', 'Tutorial'] &&
+        (!('professor' in data) || (data.professor is string && data.professor.size() <= 100));
+    }
+
+    function isValidExam(data) {
+      return data.keys().hasAll(['userId', 'courseCode', 'subjectName', 'examTitle', 'dateISO', 'displayDate', 'daysRemaining', 'room', 'syllabusProgress']) &&
+        data.keys().hasOnly([
+          'userId', 'courseCode', 'subjectName', 'examTitle', 'dateISO', 'displayDate',
+          'daysRemaining', 'room', 'syllabusProgress', 'itemType', 'dueTime'
+        ]) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 20 &&
+        data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120 &&
+        data.examTitle is string && data.examTitle.size() >= 1 && data.examTitle.size() <= 140 &&
+        data.dateISO is string && data.dateISO.size() >= 4 && data.dateISO.size() <= 20 &&
+        data.displayDate is string && data.displayDate.size() >= 3 && data.displayDate.size() <= 40 &&
+        data.daysRemaining is number && data.daysRemaining >= 0 && data.daysRemaining <= 365 &&
+        data.room is string && data.room.size() >= 1 && data.room.size() <= 40 &&
+        data.syllabusProgress is number && data.syllabusProgress >= 0 && data.syllabusProgress <= 100 &&
+        (!('itemType' in data) || data.itemType in ['Exam', 'Assignment', 'Quiz']) &&
+        (!('dueTime' in data) || (data.dueTime is string && data.dueTime.size() <= 10));
+    }
+
+    function isValidStudyTask(data) {
+      return data.keys().hasAll(['userId', 'title', 'courseCode', 'dueLabel', 'estimatedMinutes', 'completed']) &&
+        data.keys().hasOnly([
+          'userId', 'title', 'courseCode', 'dueLabel', 'estimatedMinutes',
+          'completed', 'linkedExamId', 'linkedExamLabel'
+        ]) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+        data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 20 &&
+        data.dueLabel is string && data.dueLabel.size() >= 1 && data.dueLabel.size() <= 40 &&
+        data.estimatedMinutes is number && data.estimatedMinutes >= 1 && data.estimatedMinutes <= 600 &&
+        data.completed is bool &&
+        (!('linkedExamId' in data) || (data.linkedExamId is string && data.linkedExamId.size() <= 128)) &&
+        (!('linkedExamLabel' in data) || (data.linkedExamLabel is string && data.linkedExamLabel.size() <= 140));
+    }
+
+    function isValidMark(data) {
+      return data.keys().hasAll(['userId', 'courseCode', 'subjectName', 'assessmentTitle', 'scoreObtained', 'maxScore', 'weightagePercent', 'dateISO']) &&
+        data.keys().hasOnly([
+          'userId', 'courseCode', 'subjectName', 'assessmentTitle', 'assessmentType',
+          'scoreObtained', 'maxScore', 'weightagePercent', 'dateISO'
+        ]) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 20 &&
+        data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120 &&
+        data.assessmentTitle is string && data.assessmentTitle.size() >= 1 && data.assessmentTitle.size() <= 140 &&
+        (!('assessmentType' in data) || data.assessmentType in ['Exam', 'Quiz', 'Assignment']) &&
+        data.scoreObtained is number && data.scoreObtained >= 0 &&
+        data.maxScore is number && data.maxScore >= 1 &&
+        data.scoreObtained <= data.maxScore &&
+        data.weightagePercent is number && data.weightagePercent >= 0 && data.weightagePercent <= 100 &&
+        data.dateISO is string && data.dateISO.size() >= 4 && data.dateISO.size() <= 20;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'title', 'description', 'timestamp', 'severity', 'read', 'actionRoute']) &&
+        data.keys().hasOnly(['userId', 'title', 'description', 'timestamp', 'severity', 'read', 'actionRoute']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        data.description is string && data.description.size() >= 1 && data.description.size() <= 400 &&
+        data.timestamp is string && data.timestamp.size() >= 1 && data.timestamp.size() <= 40 &&
+        data.severity in ['critical', 'warning', 'info', 'milestone'] &&
+        data.read is bool &&
+        data.actionRoute is string && data.actionRoute.size() >= 1 && data.actionRoute.size() <= 60;
+    }
+
+    function isValidAchievement(data) {
+      return data.keys().hasAll(['userId', 'title', 'criteria', 'earned', 'progressCurrent', 'progressTarget']) &&
+        data.keys().hasOnly(['userId', 'title', 'criteria', 'earned', 'earnedDate', 'progressCurrent', 'progressTarget']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.criteria is string && data.criteria.size() >= 1 && data.criteria.size() <= 240 &&
+        data.earned is bool &&
+        (!('earnedDate' in data) || (data.earnedDate is string && data.earnedDate.size() <= 40)) &&
+        data.progressCurrent is number && data.progressCurrent >= 0 &&
+        data.progressTarget is number && data.progressTarget >= 1;
+    }
+
+    function isValidMonthlyReport(data) {
+      return data.keys().hasAll(['userId', 'monthLabel', 'attendanceRate', 'classesAttended', 'classesHeld', 'statusLabel', 'topSubject']) &&
+        data.keys().hasOnly(['userId', 'monthLabel', 'attendanceRate', 'classesAttended', 'classesHeld', 'statusLabel', 'topSubject']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.monthLabel is string && data.monthLabel.size() >= 1 && data.monthLabel.size() <= 60 &&
+        data.attendanceRate is number && data.attendanceRate >= 0 && data.attendanceRate <= 100 &&
+        data.classesAttended is number && data.classesAttended >= 0 &&
+        data.classesHeld is number && data.classesHeld >= 0 &&
+        data.classesAttended <= data.classesHeld &&
+        data.statusLabel is string && data.statusLabel.size() >= 1 && data.statusLabel.size() <= 40 &&
+        data.topSubject is string && data.topSubject.size() >= 1 && data.topSubject.size() <= 140;
+    }
+
+    // 1. users/{uid} (Strict owner-only PII isolation)
+    match /users/{uid} {
+      allow get: if isValidId(uid) && isOwner(uid);
+      allow create: if isValidId(uid) && isOwner(uid) && isValidUserProfile(incoming(), uid);
+      allow update: if isValidId(uid) && isOwner(uid) &&
+        isValidUserProfile(incoming(), uid) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'email', 'studentId', 'college', 'branch', 'program', 'semester',
+          'semesterNumber', 'currentWeek', 'totalWeeks', 'targetAttendance', 'semesterStart', 'semesterEnd',
+          'dailyStudyGoalHours', 'alertLowAttendance', 'alertExamReminders', 'alertWeeklyDigest',
+          'onboardingCompleted'
+        ]);
+      allow delete: if isValidId(uid) && isOwner(uid);
+    }
+
+    // 2. subjects (Scoped by userId)
+    match /subjects/{subjectId} {
+      allow get: if isValidId(subjectId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(subjectId) && isSignedIn() && isValidSubject(incoming());
+      allow update: if isValidId(subjectId) && isDocOwner() &&
+        isValidSubject(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'code', 'name', 'instructor', 'credits',
+          'attendedClasses', 'totalClasses', 'weeklyHours', 'gradePoint', 'currentGrade',
+          'targetAttendance'
+        ]);
+      allow delete: if isValidId(subjectId) && isDocOwner();
+    }
+
+    // 3. attendance (Class logs scoped by userId)
+    match /attendance/{logId} {
+      allow get: if isValidId(logId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(logId) && isSignedIn() && isValidAttendanceLog(incoming());
+      allow update: if isValidId(logId) && isDocOwner() &&
+        isValidAttendanceLog(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'subjectId', 'courseCode', 'subjectName', 'status', 'dateISO', 'topic', 'timetableSlotId'
+        ]);
+      allow delete: if isValidId(logId) && isDocOwner();
+    }
+
+    // 4. timetable (Weekly schedules scoped by userId)
+    match /timetable/{slotId} {
+      allow get: if isValidId(slotId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(slotId) && isSignedIn() && isValidTimetableSlot(incoming());
+      allow update: if isValidId(slotId) && isDocOwner() &&
+        isValidTimetableSlot(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'day', 'timeRange', 'courseCode', 'subjectName', 'room', 'sessionType', 'professor'
+        ]);
+      allow delete: if isValidId(slotId) && isDocOwner();
+    }
+
+    // 5. exams (Exam dates & deadlines scoped by userId)
+    match /exams/{examId} {
+      allow get: if isValidId(examId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(examId) && isSignedIn() && isValidExam(incoming());
+      allow update: if isValidId(examId) && isDocOwner() &&
+        isValidExam(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'courseCode', 'subjectName', 'examTitle', 'dateISO', 'displayDate',
+          'daysRemaining', 'room', 'syllabusProgress', 'itemType', 'dueTime'
+        ]);
+      allow delete: if isValidId(examId) && isDocOwner();
+    }
+
+    // 6. studyTasks (Study plans scoped by userId)
+    match /studyTasks/{taskId} {
+      allow get: if isValidId(taskId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(taskId) && isSignedIn() && isValidStudyTask(incoming());
+      allow update: if isValidId(taskId) && isDocOwner() &&
+        isValidStudyTask(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'courseCode', 'dueLabel', 'estimatedMinutes',
+          'completed', 'linkedExamId', 'linkedExamLabel'
+        ]);
+      allow delete: if isValidId(taskId) && isDocOwner();
+    }
+
+    // 7. marks (Internal exam & assignment scores scoped by userId)
+    match /marks/{markId} {
+      allow get: if isValidId(markId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(markId) && isSignedIn() && isValidMark(incoming());
+      allow update: if isValidId(markId) && isDocOwner() &&
+        isValidMark(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'courseCode', 'subjectName', 'assessmentTitle', 'assessmentType',
+          'scoreObtained', 'maxScore', 'weightagePercent', 'dateISO'
+        ]);
+      allow delete: if isValidId(markId) && isDocOwner();
+    }
+
+    // 8. notifications (Alerts scoped by userId)
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(notificationId) && isSignedIn() && isValidNotification(incoming());
+      allow update: if isValidId(notificationId) && isDocOwner() &&
+        isValidNotification(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isValidId(notificationId) && isDocOwner();
+    }
+
+    // 9. achievements (Earned badges scoped by userId)
+    match /achievements/{achievementId} {
+      allow get: if isValidId(achievementId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(achievementId) && isSignedIn() && isValidAchievement(incoming());
+      allow update: if isValidId(achievementId) && isDocOwner() &&
+        isValidAchievement(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['earned', 'earnedDate', 'progressCurrent']);
+      allow delete: if isValidId(achievementId) && isDocOwner();
+    }
+
+    // 10. monthlyReports (Generated report snapshots scoped by userId)
+    match /monthlyReports/{reportId} {
+      allow get: if isValidId(reportId) && isDocOwner();
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(reportId) && isSignedIn() && isValidMonthlyReport(incoming());
+      allow update: if isValidId(reportId) && isDocOwner() &&
+        isValidMonthlyReport(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'attendanceRate', 'classesAttended', 'classesHeld', 'statusLabel', 'topSubject'
+        ]);
+      allow delete: if isValidId(reportId) && isDocOwner();
+    }
+  }
+}

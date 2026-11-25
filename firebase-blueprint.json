@@ -1,0 +1,221 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Student profile, target attendance benchmark, and semester boundary dates",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "studentId": { "type": "string", "maxLength": 40 },
+        "college": { "type": "string", "maxLength": 120 },
+        "branch": { "type": "string", "maxLength": 120 },
+        "program": { "type": "string", "maxLength": 120 },
+        "semester": { "type": "string", "maxLength": 80 },
+        "semesterNumber": { "type": "number" },
+        "currentWeek": { "type": "number" },
+        "totalWeeks": { "type": "number" },
+        "targetAttendance": { "type": "number" },
+        "semesterStart": { "type": "string", "maxLength": 20 },
+        "semesterEnd": { "type": "string", "maxLength": 20 },
+        "dailyStudyGoalHours": { "type": "number" },
+        "alertLowAttendance": { "type": "boolean" },
+        "alertExamReminders": { "type": "boolean" },
+        "alertWeeklyDigest": { "type": "boolean" },
+        "onboardingCompleted": { "type": "boolean" }
+      },
+      "required": ["userId", "name", "email", "targetAttendance", "semesterStart", "semesterEnd"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Enrolled course attendance counters and weekly schedule frequency",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "instructor": { "type": "string", "maxLength": 100 },
+        "credits": { "type": "number" },
+        "attendedClasses": { "type": "number" },
+        "totalClasses": { "type": "number" },
+        "weeklyHours": { "type": "number" },
+        "gradePoint": { "type": "number" },
+        "currentGrade": { "type": "string", "maxLength": 8 },
+        "targetAttendance": { "type": "number" }
+      },
+      "required": ["userId", "code", "name", "attendedClasses", "totalClasses", "weeklyHours"]
+    },
+    "AttendanceLog": {
+      "title": "AttendanceLog",
+      "description": "Individual class session attendance log entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "courseCode": { "type": "string", "maxLength": 20 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["present", "absent", "cancelled"] },
+        "dateISO": { "type": "string", "maxLength": 20 },
+        "topic": { "type": "string", "maxLength": 200 },
+        "timetableSlotId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["userId", "subjectId", "courseCode", "subjectName", "status", "dateISO", "topic"]
+    },
+    "TimetableSlot": {
+      "title": "TimetableSlot",
+      "description": "Weekly recurring lecture or laboratory timetable slot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "day": { "type": "string", "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
+        "timeRange": { "type": "string", "maxLength": 40 },
+        "courseCode": { "type": "string", "maxLength": 20 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "room": { "type": "string", "maxLength": 40 },
+        "sessionType": { "type": "string", "enum": ["Lecture", "Laboratory", "Tutorial"] },
+        "professor": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["userId", "day", "timeRange", "courseCode", "subjectName", "room", "sessionType"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Upcoming exam schedule, deadlines, and preparation progress",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseCode": { "type": "string", "maxLength": 20 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "examTitle": { "type": "string", "maxLength": 140 },
+        "dateISO": { "type": "string", "maxLength": 20 },
+        "displayDate": { "type": "string", "maxLength": 40 },
+        "daysRemaining": { "type": "number" },
+        "room": { "type": "string", "maxLength": 40 },
+        "syllabusProgress": { "type": "number" },
+        "itemType": { "type": "string", "enum": ["Exam", "Assignment", "Quiz"] },
+        "dueTime": { "type": "string", "maxLength": 10 }
+      },
+      "required": ["userId", "courseCode", "subjectName", "examTitle", "dateISO", "displayDate", "daysRemaining", "room", "syllabusProgress"]
+    },
+    "StudyTask": {
+      "title": "StudyTask",
+      "description": "Study planner task item and completion state",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "courseCode": { "type": "string", "maxLength": 20 },
+        "dueLabel": { "type": "string", "maxLength": 40 },
+        "estimatedMinutes": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "linkedExamId": { "type": "string", "maxLength": 128 },
+        "linkedExamLabel": { "type": "string", "maxLength": 140 }
+      },
+      "required": ["userId", "title", "courseCode", "dueLabel", "estimatedMinutes", "completed"]
+    },
+    "MarkRecord": {
+      "title": "MarkRecord",
+      "description": "Internal exam and assignment score record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseCode": { "type": "string", "maxLength": 20 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "assessmentTitle": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "assessmentType": { "type": "string", "enum": ["Exam", "Quiz", "Assignment"] },
+        "scoreObtained": { "type": "number" },
+        "maxScore": { "type": "number" },
+        "weightagePercent": { "type": "number" },
+        "dateISO": { "type": "string", "maxLength": 20 }
+      },
+      "required": ["userId", "courseCode", "subjectName", "assessmentTitle", "scoreObtained", "maxScore", "weightagePercent", "dateISO"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Threshold alert or exam deadline notification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 400 },
+        "timestamp": { "type": "string", "maxLength": 40 },
+        "severity": { "type": "string", "enum": ["critical", "warning", "info", "milestone"] },
+        "read": { "type": "boolean" },
+        "actionRoute": { "type": "string", "maxLength": 60 }
+      },
+      "required": ["userId", "title", "description", "timestamp", "severity", "read", "actionRoute"]
+    },
+    "Achievement": {
+      "title": "Achievement",
+      "description": "Student consistency badge and milestone progress",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "maxLength": 120 },
+        "criteria": { "type": "string", "maxLength": 240 },
+        "earned": { "type": "boolean" },
+        "earnedDate": { "type": "string", "maxLength": 40 },
+        "progressCurrent": { "type": "number" },
+        "progressTarget": { "type": "number" }
+      },
+      "required": ["userId", "title", "criteria", "earned", "progressCurrent", "progressTarget"]
+    },
+    "MonthlyReport": {
+      "title": "MonthlyReport",
+      "description": "Generated monthly attendance report snapshot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "monthLabel": { "type": "string", "maxLength": 60 },
+        "attendanceRate": { "type": "number" },
+        "classesAttended": { "type": "number" },
+        "classesHeld": { "type": "number" },
+        "statusLabel": { "type": "string", "maxLength": 40 },
+        "topSubject": { "type": "string", "maxLength": 140 }
+      },
+      "required": ["userId", "monthLabel", "attendanceRate", "classesAttended", "classesHeld", "statusLabel", "topSubject"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Student profile and benchmark settings strictly owned by uid"
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Enrolled subjects scoped by userId"
+    },
+    "/attendance/{logId}": {
+      "schema": { "$ref": "#/entities/AttendanceLog" },
+      "description": "Class attendance logs scoped by userId"
+    },
+    "/timetable/{slotId}": {
+      "schema": { "$ref": "#/entities/TimetableSlot" },
+      "description": "Weekly timetable slots scoped by userId"
+    },
+    "/exams/{examId}": {
+      "schema": { "$ref": "#/entities/Exam" },
+      "description": "Exam schedules scoped by userId"
+    },
+    "/studyTasks/{taskId}": {
+      "schema": { "$ref": "#/entities/StudyTask" },
+      "description": "Study planner tasks scoped by userId"
+    },
+    "/marks/{markId}": {
+      "schema": { "$ref": "#/entities/MarkRecord" },
+      "description": "Internal assessment marks scoped by userId"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Student notifications scoped by userId"
+    },
+    "/achievements/{achievementId}": {
+      "schema": { "$ref": "#/entities/Achievement" },
+      "description": "Earned badges and streak milestones scoped by userId"
+    },
+    "/monthlyReports/{reportId}": {
+      "schema": { "$ref": "#/entities/MonthlyReport" },
+      "description": "Monthly attendance report snapshots scoped by userId"
+    }
+  }
+}
